@@ -1,0 +1,595 @@
+<script>
+    // 游戏核心对象
+    const game = {
+        canvas: document.getElementById('gameCanvas'),
+        ctx: document.getElementById('gameCanvas').getContext('2d'),
+        width: 800,
+        height: 600,
+        level: 1,
+        maxLevels: 10,
+        gameState: 'playing', // playing, won, lost
+        players: [
+            { x: 50, y: 50, width: 20, height: 20, color: '#4287f5', speed: 3, 
+              controls: { up: 'W', down: 'S', left: 'A', right: 'D' },
+              punished: { leftRight: false, upDown: false } },
+            { x: 100, y: 50, width: 20, height: 20, color: '#f54242', speed: 3,
+              controls: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' },
+              punished: { leftRight: false, upDown: false } }
+        ],
+        platforms: [],
+        penalties: [],
+        antidotes: [],
+        finishArea: { x: 700, y: 500, width: 100, height: 100 },
+        keysPressed: {},
+        audio: {
+            penalty: new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA='),
+            antidote: new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA='),
+            win: new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=')
+        },
+        init: function() {
+            this.setupEventListeners();
+            this.loadLevel(this.level);
+            this.gameLoop();
+        },
+        setupEventListeners: function() {
+            document.addEventListener('keydown', (e) => {
+                this.keysPressed[e.key] = true;
+                e.preventDefault();
+            });
+            document.addEventListener('keyup', (e) => {
+                this.keysPressed[e.key] = false;
+                e.preventDefault();
+            });
+        },
+        loadLevel: function(level) {
+            this.level = level;
+            document.getElementById('levelInfo').textContent = `Level: ${level}`;
+            
+            // 清空当前关卡元素
+            this.platforms = [];
+            this.penalties = [];
+            this.antidotes = [];
+            
+            // 加载关卡数据
+            const levelData = this.getLevelData(level);
+            this.players[0].x = levelData.player1Start.x;
+            this.players[0].y = levelData.player1Start.y;
+            this.players[1].x = levelData.player2Start.x;
+            this.players[1].y = levelData.player2Start.y;
+            
+            // 重置玩家状态
+            this.players.forEach(player => {
+                player.punished.leftRight = false;
+                player.punished.upDown = false;
+            });
+            
+            // 创建平台
+            levelData.platforms.forEach(platform => {
+                this.platforms.push({
+                    x: platform.x,
+                    y: platform.y,
+                    width: platform.width,
+                    height: platform.height,
+                    color: platform.color || '#888'
+                });
+            });
+            
+            // 创建惩罚机关
+            levelData.penalties.forEach(penalty => {
+                this.penalties.push({
+                    x: penalty.x,
+                    y: penalty.y,
+                    width: penalty.width,
+                    height: penalty.height,
+                    type: penalty.type, // 'A' or 'B'
+                    target: penalty.target // 'both', 'player1', 'player2'
+                });
+            });
+            
+            // 创建解药
+            levelData.antidotes.forEach(antidote => {
+                this.antidotes.push({
+                    x: antidote.x,
+                    y: antidote.y,
+                    width: antidote.width,
+                    height: antidote.height,
+                    type: antidote.type // 'A' or 'B'
+                });
+            });
+            
+            // 设置终点区域
+            this.finishArea = {
+                x: levelData.finishArea.x,
+                y: levelData.finishArea.y,
+                width: levelData.finishArea.width,
+                height: levelData.finishArea.height
+            };
+        },
+        getLevelData: function(level) {
+            // 关卡数据定义
+            const levels = [
+                // Level 1
+                {
+                    player1Start: { x: 50, y: 50 },
+                    player2Start: { x: 100, y: 50 },
+                    platforms: [
+                        { x: 0, y: 580, width: 800, height: 20 },
+                        { x: 200, y: 500, width: 100, height: 20 },
+                        { x: 400, y: 450, width: 100, height: 20 },
+                        { x: 600, y: 400, width: 100, height: 20 }
+                    ],
+                    penalties: [
+                        { x: 300, y: 480, width: 20, height: 20, type: 'A', target: 'both' }
+                    ],
+                    antidotes: [
+                        { x: 350, y: 480, width: 20, height: 20, type: 'A' }
+                    ],
+                    finishArea: { x: 700, y: 500, width: 100, height: 100 }
+                },
+                // Level 2
+                {
+                    player1Start: { x: 50, y: 50 },
+                    player2Start: { x: 100, y: 50 },
+                    platforms: [
+                        { x: 0, y: 580, width: 800, height: 20 },
+                        { x: 150, y: 500, width: 100, height: 20 },
+                        { x: 300, y: 450, width: 100, height: 20 },
+                        { x: 450, y: 400, width: 100, height: 20 },
+                        { x: 600, y: 350, width: 100, height: 20 }
+                    ],
+                    penalties: [
+                        { x: 250, y: 430, width: 20, height: 20, type: 'B', target: 'player1' },
+                        { x: 400, y: 380, width: 20, height: 20, type: 'A', target: 'player2' }
+                    ],
+                    antidotes: [
+                        { x: 300, y: 430, width: 20, height: 20, type: 'B' },
+                        { x: 450, y: 380, width: 20, height: 20, type: 'A' }
+                    ],
+                    finishArea: { x: 700, y: 500, width: 100, height: 100 }
+                },
+                // Level 3
+                {
+                    player1Start: { x: 50, y: 50 },
+                    player2Start: { x: 100, y: 50 },
+                    platforms: [
+                        { x: 0, y: 580, width: 800, height: 20 },
+                        { x: 100, y: 500, width: 100, height: 20 },
+                        { x: 200, y: 450, width: 100, height: 20 },
+                        { x: 300, y: 400, width: 100, height: 20 },
+                        { x: 400, y: 350, width: 100, height: 20 },
+                        { x: 500, y: 300, width: 100, height: 20 },
+                        { x: 600, y: 250, width: 100, height: 20 }
+                    ],
+                    penalties: [
+                        { x: 150, y: 480, width: 20, height: 20, type: 'A', target: 'both' },
+                        { x: 250, y: 430, width: 20, height: 20, type: 'B', target: 'player1' },
+                        { x: 350, y: 380, width: 20, height: 20, type: 'A', target: 'player2' }
+                    ],
+                    antidotes: [
+                        { x: 200, y: 480, width: 20, height: 20, type: 'A' },
+                        { x: 300, y: 430, width: 20, height: 20, type: 'B' },
+                        { x: 400, y: 380, width: 20, height: 20, type: 'A' }
+                    ],
+                    finishArea: { x: 700, y: 500, width: 100, height: 100 }
+                },
+                // Level 4
+                {
+                    player1Start: { x: 50, y: 50 },
+                    player2Start: { x: 100, y: 50 },
+                    platforms: [
+                        { x: 0, y: 580, width: 800, height: 20 },
+                        { x: 150, y: 500, width: 100, height: 20 },
+                        { x: 300, y: 450, width: 100, height: 20 },
+                        { x: 450, y: 400, width: 100, height: 20 },
+                        { x: 600, y: 350, width: 100, height: 20 },
+                        { x: 50, y: 300, width: 100, height: 20 },
+                        { x: 200, y: 250, width: 100, height: 20 }
+                    ],
+                    penalties: [
+                        { x: 250, y: 430, width: 20, height: 20, type: 'B', target: 'both' },
+                        { x: 400, y: 380, width: 20, height: 20, type: 'A', target: 'player1' },
+                        { x: 100, y: 280, width: 20, height: 20, type: 'B', target: 'player2' }
+                    ],
+                    antidotes: [
+                        { x: 300, y: 430, width: 20, height: 20, type: 'B' },
+                        { x: 450, y: 380, width: 20, height: 20, type: 'A' },
+                        { x: 150, y: 280, width: 20, height: 20, type: 'B' }
+                    ],
+                    finishArea: { x: 700, y: 500, width: 100, height: 100 }
+                },
+                // Level 5
+                {
+                    player1Start: { x: 50, y: 50 },
+                    player2Start: { x: 100, y: 50 },
+                    platforms: [
+                        { x: 0, y: 580, width: 800, height: 20 },
+                        { x: 100, y: 500, width: 100, height: 20 },
+                        { x: 200, y: 450, width: 100, height: 20 },
+                        { x: 300, y: 400, width: 100, height: 20 },
+                        { x: 400, y: 350, width: 100, height: 20 },
+                        { x: 500, y: 300, width: 100, height: 20 },
+                        { x: 600, y: 250, width: 100, height: 20 },
+                        { x: 50, y: 200, width: 100, height: 20 }
+                    ],
+                    penalties: [
+                        { x: 150, y: 480, width: 20, height: 20, type: 'A', target: 'both' },
+                        { x: 250, y: 430, width: 20, height: 20, type: 'B', target: 'player1' },
+                        { x: 350, y: 380, width: 20, height: 20, type: 'A', target: 'player2' },
+                        { x: 100, y: 180, width: 20, height: 20, type: 'B', target: 'both' }
+                    ],
+                    antidotes: [
+                        { x: 200, y: 480, width: 20, height: 20, type: 'A' },
+                        { x: 300, y: 430, width: 20, height: 20, type: 'B' },
+                        { x: 400, y: 380, width: 20, height: 20, type: 'A' },
+                        { x: 150, y: 180, width: 20, height: 20, type: 'B' }
+                    ],
+                    finishArea: { x: 700, y: 500, width: 100, height: 100 }
+                },
+                // Level 6
+                {
+                    player1Start: { x: 50, y: 50 },
+                    player2Start: { x: 100, y: 50 },
+                    platforms: [
+                        { x: 0, y: 580, width: 800, height: 20 },
+                        { x: 150, y: 500, width: 100, height: 20 },
+                        { x: 300, y: 450, width: 100, height: 20 },
+                        { x: 450, y: 400, width: 100, height: 20 },
+                        { x: 600, y: 350, width: 100, height: 20 },
+                        { x: 50, y: 300, width: 100, height: 20 },
+                        { x: 200, y: 250, width: 100, height: 20 },
+                        { x: 350, y: 200, width: 100, height: 20 }
+                    ],
+                    penalties: [
+                        { x: 250, y: 430, width: 20, height: 20, type: 'B', target: 'both' },
+                        { x: 400, y: 380, width: 20, height: 20, type: 'A', target: 'player1' },
+                        { x: 100, y: 280, width: 20, height: 20, type: 'B', target: 'player2' },
+                        { x: 300, y: 180, width: 20, height: 20, type: 'A', target: 'both' }
+                    ],
+                    antidotes: [
+                        { x: 300, y: 430, width: 20, height: 20, type: 'B' },
+                        { x: 450, y: 380, width: 20, height: 20, type: 'A' },
+                        { x: 150, y: 280, width: 20, height: 20, type: 'B' },
+                        { x: 350, y: 180, width: 20, height: 20, type: 'A' }
+                    ],
+                    finishArea: { x: 700, y: 500, width: 100, height: 100 }
+                },
+                // Level 7
+                {
+                    player1Start: { x: 50, y: 50 },
+                    player2Start: { x: 100, y: 50 },
+                    platforms: [
+                        { x: 0, y: 580, width: 800, height: 20 },
+                        { x: 100, y: 500, width: 100, height: 20 },
+                        { x: 200, y: 450, width: 100, height: 20 },
+                        { x: 300, y: 400, width: 100, height: 20 },
+                        { x: 400, y: 350, width: 100, height: 20 },
+                        { x: 500, y: 300, width: 100, height: 20 },
+                        { x: 600, y: 250, width: 100, height: 20 },
+                        { x: 50, y: 200, width: 100, height: 20 },
+                        { x: 150, y: 150, width: 100, height: 20 }
+                    ],
+                    penalties: [
+                        { x: 150, y: 480, width: 20, height: 20, type: 'A', target: 'both' },
+                        { x: 250, y: 430, width: 20, height: 20, type: 'B', target: 'player1' },
+                        { x: 350, y: 380, width: 20, height: 20, type: 'A', target: 'player2' },
+                        { x: 100, y: 180, width: 20, height: 20, type: 'B', target: 'both' },
+                        { x: 200, y: 130, width: 20, height: 20, type: 'A', target: 'player1' }
+                    ],
+                    antidotes: [
+                        { x: 200, y: 480, width: 20, height: 20, type: 'A' },
+                        { x: 300, y: 430, width: 20, height: 20, type: 'B' },
+                        { x: 400, y: 380, width: 20, height: 20, type: 'A' },
+                        { x: 150, y: 180, width: 20, height: 20, type: 'B' },
+                        { x: 250, y: 130, width: 20, height: 20, type: 'A' }
+                    ],
+                    finishArea: { x: 700, y: 500, width: 100, height: 100 }
+                },
+                // Level 8
+                {
+                    player1Start: { x: 50, y: 50 },
+                    player2Start: { x: 100, y: 50 },
+                    platforms: [
+                        { x: 0, y: 580, width: 800, height: 20 },
+                        { x: 150, y: 500, width: 100, height: 20 },
+                        { x: 300, y: 450, width: 100, height: 20 },
+                        { x: 450, y: 400, width: 100, height: 20 },
+                        { x: 600, y: 350, width: 100, height: 20 },
+                        { x: 50, y: 300, width: 100, height: 20 },
+                        { x: 200, y: 250, width: 100, height: 20 },
+                        { x: 350, y: 200, width: 100, height: 20 },
+                        { x: 500, y: 150, width: 100, height: 20 }
+                    ],
+                    penalties: [
+                        { x: 250, y: 430, width: 20, height: 20, type: 'B', target: 'both' },
+                        { x: 400, y: 380, width: 20, height: 20, type: 'A', target: 'player1' },
+                        { x: 100, y: 280, width: 20, height: 20, type: 'B', target: 'player2' },
+                        { x: 300, y: 180, width: 20, height: 20, type: 'A', target: 'both' },
+                        { x: 450, y: 130, width: 20, height: 20, type: 'B', target: 'player1' }
+                    ],
+                    antidotes: [
+                        { x: 300, y: 430, width: 20, height: 20, type: 'B' },
+                        { x: 450, y: 380, width: 20, height: 20, type: 'A' },
+                        { x: 150, y: 280, width: 20, height: 20, type: 'B' },
+                        { x: 350, y: 180, width: 20, height: 20, type: 'A' },
+                        { x: 500, y: 130, width: 20, height: 20, type: 'B' }
+                    ],
+                    finishArea: { x: 700, y: 500, width: 100, height: 100 }
+                },
+                // Level 9
+                {
+                    player1Start: { x: 50, y: 50 },
+                    player2Start: { x: 100, y: 50 },
+                    platforms: [
+                        { x: 0, y: 580, width: 800, height: 20 },
+                        { x: 100, y: 500, width: 100, height: 20 },
+                        { x: 200, y: 450, width: 100, height: 20 },
+                        { x: 300, y: 400, width: 100, height: 20 },
+                        { x: 400, y: 350, width: 100, height: 20 },
+                        { x: 500, y: 300, width: 100, height: 20 },
+                        { x: 600, y: 250, width: 100, height: 20 },
+                        { x: 50, y: 200, width: 100, height: 20 },
+                        { x: 150, y: 150, width: 100, height: 20 },
+                        { x: 250, y: 100, width: 100, height: 20 }
+                    ],
+                    penalties: [
+                        { x: 150, y: 480, width: 20, height: 20, type: 'A', target: 'both' },
+                        { x: 250, y: 430, width: 20, height: 20, type: 'B', target: 'player1' },
+                        { x: 350, y: 380, width: 20, height: 20, type: 'A', target: 'player2' },
+                        { x: 100, y: 180, width: 20, height: 20, type: 'B', target: 'both' },
+                        { x: 200, y: 130, width: 20, height: 20, type: 'A', target: 'player1' },
+                        { x: 300, y: 80, width: 20, height: 20, type: 'B', target: 'player2' }
+                    ],
+                    antidotes: [
+                        { x: 200, y: 480, width: 20, height: 20, type: 'A' },
+                        { x: 300, y: 430, width: 20, height: 20, type: 'B' },
+                        { x: 400, y: 380, width: 20, height: 20, type: 'A' },
+                        { x: 150, y: 180, width: 20, height: 20, type: 'B' },
+                        { x: 250, y: 130, width: 20, height: 20, type: 'A' },
+                        { x: 350, y: 80, width: 20, height: 20, type: 'B' }
+                    ],
+                    finishArea: { x: 700, y: 500, width: 100, height: 100 }
+                },
+                // Level 10
+                {
+                    player1Start: { x: 50, y: 50 },
+                    player2Start: { x: 100, y: 50 },
+                    platforms: [
+                        { x: 0, y: 580, width: 800, height: 20 },
+                        { x: 150, y: 500, width: 100, height: 20 },
+                        { x: 300, y: 450, width: 100, height: 20 },
+                        { x: 450, y: 400, width: 100, height: 20 },
+                        { x: 600, y: 350, width: 100, height: 20 },
+                        { x: 50, y: 300, width: 100, height: 20 },
+                        { x: 200, y: 250, width: 100, height: 20 },
+                        { x: 350, y: 200, width: 100, height: 20 },
+                        { x: 500, y: 150, width: 100, height: 20 },
+                        { x: 100, y: 100, width: 100, height: 20 }
+                    ],
+                    penalties: [
+                        { x: 250, y: 430, width: 20, height: 20, type: 'B', target: 'both' },
+                        { x: 400, y: 380, width: 20, height: 20, type: 'A', target: 'player1' },
+                        { x: 100, y: 280, width: 20, height: 20, type: 'B', target: 'player2' },
+                        { x: 300, y: 180, width: 20, height: 20, type: 'A', target: 'both' },
+                        { x: 450, y: 130, width: 20, height: 20, type: 'B', target: 'player1' },
+                        { x: 150, y: 80, width: 20, height: 20, type: 'A', target: 'player2' }
+                    ],
+                    antidotes: [
+                        { x: 300, y: 430, width: 20, height: 20, type: 'B' },
+                        { x: 450, y: 380, width: 20, height: 20, type: 'A' },
+                        { x: 150, y: 280, width: 20, height: 20, type: 'B' },
+                        { x: 350, y: 180, width: 20, height: 20, type: 'A' },
+                        { x: 500, y: 130, width: 20, height: 20, type: 'B' },
+                        { x: 200, y: 80, width: 20, height: 20, type: 'A' }
+                    ],
+                    finishArea: { x: 700, y: 500, width: 100, height: 100 }
+                }
+            ];
+            
+            return levels[level - 1];
+        },
+        gameLoop: function() {
+            this.update();
+            this.draw();
+            requestAnimationFrame(() => this.gameLoop());
+        },
+        update: function() {
+            if (this.gameState !== 'playing') return;
+            
+            // 更新玩家位置
+            this.players.forEach((player, index) => {
+                let dx = 0;
+                let dy = 0;
+                
+                // 处理左右移动
+                if (this.keysPressed[player.controls.left]) dx -= player.speed;
+                if (this.keysPressed[player.controls.right]) dx += player.speed;
+                
+                // 处理上下移动
+                if (this.keysPressed[player.controls.up]) dy -= player.speed;
+                if (this.keysPressed[player.controls.down]) dy += player.speed;
+                
+                // 应用惩罚效果
+                if (player.punished.leftRight) {
+                    dx = -dx;
+                }
+                if (player.punished.upDown) {
+                    dy = -dy;
+                }
+                
+                // 更新位置
+                player.x += dx;
+                player.y += dy;
+                
+                // 边界检查
+                if (player.x < 0) player.x = 0;
+                if (player.x > this.width - player.width) player.x = this.width - player.width;
+                if (player.y < 0) player.y = 0;
+                if (player.y > this.height - player.height) player.y = this.height - player.height;
+                
+                // 平台碰撞检测
+                this.platforms.forEach(platform => {
+                    if (this.checkCollision(player, platform)) {
+                        // 处理碰撞
+                        if (dy > 0 && player.y + player.height > platform.y && player.y < platform.y) {
+                            player.y = platform.y - player.height;
+                        } else if (dy < 0 && player.y < platform.y + platform.height && player.y > platform.y) {
+                            player.y = platform.y + platform.height;
+                        }
+                        
+                        if (dx > 0 && player.x + player.width > platform.x && player.x < platform.x) {
+                            player.x = platform.x - player.width;
+                        } else if (dx < 0 && player.x < platform.x + platform.width && player.x > platform.x) {
+                            player.x = platform.x + platform.width;
+                        }
+                    }
+                });
+                
+                // 惩罚机关碰撞检测
+                this.penalties.forEach(penalty => {
+                    if (this.checkCollision(player, penalty)) {
+                        // 应用惩罚
+                        if (penalty.type === 'A' && penalty.target !== 'player2') {
+                            player.punished.leftRight = true;
+                        }
+                        if (penalty.type === 'B' && penalty.target !== 'player2') {
+                            player.punished.upDown = true;
+                        }
+                        
+                        // 播放惩罚音效
+                        this.audio.penalty.play();
+                        
+                        // 显示惩罚效果
+                        document.getElementById(`message`).textContent = `Player ${index + 1} punished!`;
+                        document.getElementById(`message`).style.display = 'block';
+                        setTimeout(() => document.getElementById(`message`).style.display = 'none', 1000);
+                    }
+                });
+                
+                // 解药碰撞检测
+                this.antidotes.forEach((antidote, i) => {
+                    if (this.checkCollision(player, antidote)) {
+                        // 应用解药
+                        if (antidote.type === 'A') {
+                            player.punished.leftRight = false;
+                        }
+                        if (antidote.type === 'B') {
+                            player.punished.upDown = false;
+                        }
+                        
+                        // 移除解药
+                        this.antidotes.splice(i, 1);
+                        
+                        // 播放解药音效
+                        this.audio.antidote.play();
+                        
+                        // 显示解药效果
+                        document.getElementById(`message`).textContent = `Player ${index + 1} recovered!`;
+                        document.getElementById(`message`).style.display = 'block';
+                        setTimeout(() => document.getElementById(`message`).style.display = 'none', 1000);
+                    }
+                });
+            });
+            
+            // 检查胜利条件
+            const player1InFinish = this.checkCollision(this.players[0], this.finishArea);
+            const player2InFinish = this.checkCollision(this.players[1], this.finishArea);
+            
+            if (player1InFinish && player2InFinish) {
+                if (!this.players[0].punished.leftRight && !this.players[0].punished.upDown &&
+                    !this.players[1].punished.leftRight && !this.players[1].punished.upDown) {
+                    // 胜利
+                    this.gameState = 'won';
+                    document.getElementById(`message`).textContent = '闯关成功!';
+                    document.getElementById(`message`).style.display = 'block';
+                    this.audio.win.play();
+                    
+                    // 进入下一关
+                    if (this.level < this.maxLevels) {
+                        setTimeout(() => {
+                            this.level++;
+                            this.gameState = 'playing';
+                            this.loadLevel(this.level);
+                            document.getElementById(`message`).style.display = 'none';
+                        }, 2000);
+                    } else {
+                        setTimeout(() => {
+                            document.getElementById(`message`).textContent = '恭喜通关!';
+                            document.getElementById(`message`).style.display = 'block';
+                        }, 2000);
+                    }
+                } else {
+                    // 未恢复键位
+                    document.getElementById(`message`).textContent = '键位未恢复，无法通关!';
+                    document.getElementById(`message`).style.display = 'block';
+                    setTimeout(() => document.getElementById(`message`).style.display = 'none', 1000);
+                }
+            }
+        },
+        draw: function() {
+            // 清空画布
+            this.ctx.clearRect(0, 0, this.width, this.height);
+            
+            // 绘制背景
+            this.ctx.fillStyle = '#f0f0f0';
+            this.ctx.fillRect(0, 0, this.width, this.height);
+            
+            // 绘制平台
+            this.platforms.forEach(platform => {
+                this.ctx.fillStyle = platform.color;
+                this.ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+            });
+            
+            // 绘制惩罚机关
+            this.penalties.forEach(penalty => {
+                if (penalty.type === 'A') {
+                    this.ctx.fillStyle = '#F44336';
+                } else {
+                    this.ctx.fillStyle = '#2196F3';
+                }
+                this.ctx.fillRect(penalty.x, penalty.y, penalty.width, penalty.height);
+            });
+            
+            // 绘制解药
+            this.antidotes.forEach(antidote => {
+                if (antidote.type === 'A') {
+                    this.ctx.fillStyle = '#4CAF50';
+                } else {
+                    this.ctx.fillStyle = '#FFC107';
+                }
+                this.ctx.fillRect(antidote.x, antidote.y, antidote.width, antidote.height);
+            });
+            
+            // 绘制终点区域
+            this.ctx.fillStyle = '#E91E63';
+            this.ctx.fillRect(this.finishArea.x, this.finishArea.y, this.finishArea.width, this.finishArea.height);
+            
+            // 绘制玩家
+            this.players.forEach((player, index) => {
+                this.ctx.fillStyle = player.color;
+                this.ctx.fillRect(player.x, player.y, player.width, player.height);
+            });
+            
+            // 更新UI
+            this.updateUI();
+        },
+        updateUI: function() {
+            // 更新玩家状态显示
+            const player1Status = document.getElementById('player1Status');
+            const player2Status = document.getElementById('player2Status');
+            
+            player1Status.innerHTML = `Player 1: <span class="statusIcon ${this.players[0].punished.leftRight ? 'punished' : 'normal'}"></span> <span class="statusIcon ${this.players[0].punished.upDown ? 'punished' : 'normal'}"></span>`;
+            player2Status.innerHTML = `Player 2: <span class="statusIcon ${this.players[1].punished.leftRight ? 'punished' : 'normal'}"></span> <span class="statusIcon ${this.players[1].punished.upDown ? 'punished' : 'normal'}"></span>`;
+        },
+        checkCollision: function(obj1, obj2) {
+            return obj1.x < obj2.x + obj2.width &&
+                   obj1.x + obj1.width > obj2.x &&
+                   obj1.y < obj2.y + obj2.height &&
+                   obj1.y + obj1.height > obj2.y;
+        }
+    };
+    
+    // 初始化游戏
+    window.onload = () => {
+        game.init();
+    };
+</script>
