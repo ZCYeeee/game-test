@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Urban Guardian - 城市守护者</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      padding: 10px;
+    }
+    #game-container {
+      background: #16213e;
+      border-radius: 20px;
+      padding: 15px;
+      box-shadow: 0 0 40px rgba(0,0,0,0.6);
+      max-width: 850px;
+      width: 100%;
+    }
+    #top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px;
+      background: rgba(0,0,0,0.35);
+      border-radius: 12px;
+      margin-bottom: 10px;
+    }
+    .stat {
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      padding: 6px 15px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    canvas {
+      display: block;
+      border-radius: 12px;
+      background: #1a1a2e;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+      width: 100%;
+      height: auto;
+      aspect-ratio: 800 / 500;
+    }
+    #tower-panel {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin: 12px 0;
+      padding: 12px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 12px;
+    }
+    .tower-card {
+      background: #0f3460;
+      padding: 12px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+      border: 2px solid transparent;
+      min-width: 85px;
+      user-select: none;
+    }
+    .tower-card:hover {
+      border-color: #e94560;
+      transform: translateY(-4px);
+      box-shadow: 0 8px 18px rgba(233,69,96,0.3);
+    }
+    .tower-card.selected {
+      border-color: #e94560;
+      background: #1a1a4e;
+    }
+    .tower-icon { font-size: 32px; }
+    .tower-name { color: white; font-weight: bold; font-size: 13px; margin: 2px 0; }
+    .tower-cost { color: #ffd700; font-size: 12px; }
+    .tower-desc { color: #aaa; font-size: 10px; }
+    #controls {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    button {
+      padding: 10px 25px;
+      font-size: 15px;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      transition: 0.2s;
+    }
+    #startWave { background: #e94560; color: white; }
+    #startWave:hover { filter: brightness(1.1); transform: scale(1.03); }
+    #restart { background: #0f3460; color: white; }
+    #restart:hover { background: #1a1a4e; }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+    .modal-content {
+      background: #16213e;
+      padding: 35px 45px;
+      border-radius: 16px;
+      text-align: center;
+      color: white;
+    }
+    .modal-content h2 { font-size: 30px; margin-bottom: 15px; }
+    .modal-content button {
+      margin-top: 15px;
+      padding: 12px 35px;
+      font-size: 17px;
+      background: #e94560;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+<div id="game-container">
+  <div id="top-bar">
+    <div class="stat">❤️ <span id="lives">20</span></div>
+    <div class="stat">💰 <span id="gold">200</span></div>
+    <div class="stat">🌊 <span id="wave">1</span></div>
+    <div class="stat">💀 <span id="kills">0</span></div>
+  </div>
+
+  <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+  <div id="tower-panel">
+    <div class="tower-card" data-tower="school" data-cost="50">
+      <div class="tower-icon">🏫</div>
+      <div class="tower-name">学校</div>
+      <div class="tower-cost">50💰</div>
+      <div class="tower-desc">教育之光</div>
+    </div>
+    <div class="tower-card" data-tower="hospital" data-cost="75">
+      <div class="tower-icon">🏥</div>
+      <div class="tower-name">医院</div>
+      <div class="tower-cost">75💰</div>
+      <div class="tower-desc">治愈射线</div>
+    </div>
+    <div class="tower-card" data-tower="park" data-cost="40">
+      <div class="tower-icon">🌳</div>
+      <div class="tower-name">公园</div>
+      <div class="tower-cost">40💰</div>
+      <div class="tower-desc">减速空气</div>
+    </div>
+    <div class="tower-card" data-tower="police" data-cost="100">
+      <div class="tower-icon">🏛️</div>
+      <div class="tower-name">市政厅</div>
+      <div class="tower-cost">100💰</div>
+      <div class="tower-desc">秩序炮</div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button id="startWave">▶ 开始下一波</button>
+    <button id="restart">↺ 重新开始</button>
+  </div>
+
+  <div id="gameOver" class="modal">
+    <div class="modal-content">
+      <h2>🏙️ 城市陷入混乱</h2>
+      <p>你坚持了 <strong id="finalWave">0</strong> 波</p>
+      <button onclick="location.reload()">再次守护</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // ---------- 画布与状态 ----------
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const gameState = {
+      lives: 20,
+      gold: 200,
+      wave: 1,
+      kills: 0,
+      towers: [],
+      enemies: [],
+      projectiles: [],
+      selectedType: null,          // 当前准备放置的建筑类型
+      selectedTower: null,        // 已放置且被选中的塔（可查看范围）
+      mouseX: 0,
+      mouseY: 0,
+      waveActive: false,
+      gameOver: false
+    };
+
+    // 敌人路径
+    const waypoints = [
+      {x: 0, y: 250},
+      {x: 200, y: 250},
+      {x: 200, y: 100},
+      {x: 500, y: 100},
+      {x: 500, y: 400},
+      {x: 800, y: 400}
+    ];
+
+    // 建筑属性
+    const towerStats = {
+      school:  { name:'学校', icon:'🏫', cost:50,  range:120, damage:15, fireRate:60, color:'#4ecdc4', bullet:'#4ecdc4' },
+      hospital:{ name:'医院', icon:'🏥', cost:75,  range:105, damage:25, fireRate:45, color:'#ff6b6b', bullet:'#ff6b6b' },
+      park:    { name:'公园', icon:'🌳', cost:40,  range:130, damage:10, fireRate:30, color:'#95e1d3', bullet:'#95e1d3', slow:0.5 },
+      police:  { name:'市政厅', icon:'🏛️', cost:100, range:155, damage:32, fireRate:50, color:'#feca57', bullet:'#feca57' }
+    };
+
+    // ---------- 游戏对象类 ----------
+    class Enemy {
+      constructor(wave) {
+        this.x = waypoints[0].x;
+        this.y = waypoints[0].y;
+        this.wpIndex = 0;
+        this.speed = 1.5 + wave * 0.15;
+        this.health = 50 + wave * 18;
+        this.maxHealth = this.health;
+        this.radius = 14;
+        this.reward = 25 + wave * 5;
+        this.slowTimer = 0;
+      }
+      update() {
+        let spd = this.speed;
+        if (this.slowTimer > 0) {
+          this.slowTimer--;
+          spd *= 0.5;
+        }
+        const target = waypoints[this.wpIndex];
+        const dx = target.x - this.x;
+        const dy = target.y - this.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < spd) {
+          this.x = target.x;
+          this.y = target.y;
+          this.wpIndex++;
+        } else {
+          this.x += (dx/dist) * spd;
+          this.y += (dy/dist) * spd;
+        }
+      }
+      draw(ctx) {
+        ctx.save();
+        // 身体
+        ctx.fillStyle = '#e94560';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fill();
+        // 眼睛
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(this.x-5, this.y-4, 4, 0, Math.PI*2);
+        ctx.arc(this.x+5, this.y-4, 4, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.arc(this.x-5, this.y-4, 2, 0, Math.PI*2);
+        ctx.arc(this.x+5, this.y-4, 2, 0, Math.PI*2);
+        ctx.fill();
+        // 血条
+        const hpPercent = this.health / this.maxHealth;
+        ctx.fillStyle = '#222';
+        ctx.fillRect(this.x-16, this.y-24, 32, 5);
+        ctx.fillStyle = hpPercent > 0.5 ? '#2ecc71' : hpPercent > 0.2 ? '#f39c12' : '#e74c3c';
+        ctx.fillRect(this.x-16, this.y-24, 32 * hpPercent, 5);
+        ctx.restore();
+      }
+      takeDamage(dmg, slow) {
+        this.health -= dmg;
+        if (slow) this.slowTimer = 30;
+        return this.health <= 0;
+      }
+      reachedEnd() {
+        return this.wpIndex >= waypoints.length;
+      }
+    }
+
+    class Tower {
+      constructor(x, y, type) {
+        this.x = x; this.y = y; this.type = type;
+        this.cooldown = 0;
+      }
+      get stats() { return towerStats[this.type]; }
+      update(enemies) {
+        if (this.cooldown > 0) this.cooldown--;
+        // 找最近敌人
+        let target = null, minDist = this.stats.range;
+        for (let e of enemies) {
+          const dx = e.x - this.x, dy = e.y - this.y;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if (d < minDist) { minDist = d; target = e; }
+        }
+        if (target && this.cooldown <= 0) {
+          this.cooldown = this.stats.fireRate;
+          return new Projectile(this.x, this.y, target, this.stats.damage, this.stats.bullet, this.stats.slow);
+        }
+        return null;
+      }
+      draw(ctx) {
+        ctx.save();
+        // 选中时显示范围
+        if (gameState.selectedTower === this) {
+          ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.stats.range, 0, Math.PI*2);
+          ctx.stroke();
+        }
+        // 建筑方块
+        ctx.fillStyle = this.stats.color;
+        ctx.fillRect(this.x-18, this.y-18, 36, 36);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x-18, this.y-18, 36, 36);
+        // 图标
+        ctx.font = '26px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.stats.icon, this.x, this.y+1);
+        ctx.restore();
+      }
+    }
+
+    class Projectile {
+      constructor(x, y, target, damage, color, slow) {
+        this.x = x; this.y = y;
+        this.target = target;
+        this.damage = damage;
+        this.color = color;
+        this.slow = slow;
+        this.speed = 7;
+      }
+      update() {
+        if (!this.target || this.target.health <= 0) return true;
+        const dx = this.target.x - this.x;
+        const dy = this.target.y - this.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < this.speed) {
+          const killed = this.target.takeDamage(this.damage, this.slow);
+          if (killed) { gameState.gold += this.target.reward; gameState.kills++; }
+          return true;
+        }
+        this.x += (dx/dist) * this.speed;
+        this.y += (dy/dist) * this.speed;
+        return false;
+      }
+      draw(ctx) {
+        ctx.save();
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 4, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // ---------- 辅助函数 ----------
+    function pointToSegmentDist(px, py, a, b) {
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len2 = dx*dx + dy*dy;
+      if (len2 === 0) return Math.hypot(px-a.x, py-a.y);
+      let t = ((px-a.x)*dx + (py-a.y)*dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const projx = a.x + t*dx, projy = a.y + t*dy;
+      return Math.hypot(px-projx, py-projy);
+    }
+
+    function isOnPath(x, y) {
+      for (let i = 0; i < waypoints.length-1; i++) {
+        if (pointToSegmentDist(x, y, waypoints[i], waypoints[i+1]) < 22) return true;
+      }
+      return false;
+    }
+
+    function canPlaceTower(x, y) {
+      if (isOnPath(x, y)) return false;
+      return !gameState.towers.some(t => Math.hypot(t.x-x, t.y-y) < 36);
+    }
+
+    // ---------- UI 更新 ----------
+    function refreshUI() {
+      document.getElementById('lives').textContent = gameState.lives;
+      document.getElementById('gold').textContent = gameState.gold;
+      document.getElementById('wave').textContent = gameState.wave;
+      document.getElementById('kills').textContent = gameState.kills;
+    }
+
+    // ---------- 波次逻辑 ----------
+    function spawnWave() {
+      if (gameState.waveActive || gameState.gameOver) return;
+      gameState.waveActive = true;
+      document.getElementById('startWave').style.display = 'none';
+      const count = 5 + gameState.wave * 2;
+      for (let i = 0; i < count; i++) {
+        setTimeout(() => {
+          if (!gameState.gameOver) gameState.enemies.push(new Enemy(gameState.wave));
+        }, i * 600);
+      }
+    }
+
+    function endGame() {
+      gameState.gameOver = true;
+      document.getElementById('finalWave').textContent = gameState.wave;
+      document.getElementById('gameOver').style.display = 'flex';
+    }
+
+    // ---------- 绘制 ----------
+    function drawPath() {
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      // 道路阴影
+      ctx.strokeStyle = '#0f3460';
+      ctx.lineWidth = 44;
+      ctx.beginPath();
+      ctx.moveTo(waypoints[0].x, waypoints[0].y);
+      for (let i=1; i<waypoints.length; i++) ctx.lineTo(waypoints[i].x, waypoints[i].y);
+      ctx.stroke();
+      // 路面
+      ctx.strokeStyle = '#2c3e50';
+      ctx.lineWidth = 38;
+      ctx.stroke();
+      // 虚线中线
+      ctx.strokeStyle = '#f1c40f';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([15, 20]);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawPreview() {
+      if (!gameState.selectedType || gameState.mouseX === undefined) return;
+      const cost = towerStats[gameState.selectedType].cost;
+      const canPlace = canPlaceTower(gameState.mouseX, gameState.mouseY) && gameState.gold >= cost;
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = canPlace ? '#2ecc71' : '#e74c3c';
+      ctx.fillRect(gameState.mouseX-18, gameState.mouseY-18, 36, 36);
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(gameState.mouseX-18, gameState.mouseY-18, 36, 36);
+      ctx.restore();
+    }
+
+    // ---------- 主循环 ----------
+    function gameLoop() {
+      if (gameState.gameOver) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawPath();
+
+      // 更新塔并生成子弹
+      for (let t of gameState.towers) {
+        const proj = t.update(gameState.enemies);
+        if (proj) gameState.projectiles.push(proj);
+        t.draw(ctx);
+      }
+
+      // 更新敌人
+      gameState.enemies = gameState.enemies.filter(e => {
+        e.update();
+        e.draw(ctx);
+        if (e.reachedEnd()) {
+          gameState.lives--;
+          refreshUI();
+          return false;
+        }
+        return true;
+      });
+
+      // 更新子弹
+      gameState.projectiles = gameState.projectiles.filter(p => !p.update());
+      for (let p of gameState.projectiles) p.draw(ctx);
+
+      drawPreview();
+      refreshUI();
+
+      // 游戏结束条件
+      if (gameState.lives <= 0) { endGame(); return; }
+
+      // 波次清完
+      if (gameState.waveActive && gameState.enemies.length === 0) {
+        gameState.waveActive = false;
+        gameState.wave++;
+        gameState.gold += 60;
+        document.getElementById('startWave').style.display = 'inline-block';
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // ---------- 事件绑定 ----------
+    canvas.addEventListener('mousemove', e => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;   // canvas 物理像素比例
+      const scaleY = canvas.height / rect.height;
+      gameState.mouseX = (e.clientX - rect.left) * scaleX;
+      gameState.mouseY = (e.clientY - rect.top) * scaleY;
+    });
+
+    canvas.addEventListener('click', e => {
+      if (gameState.gameOver) return;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const mx = (e.clientX - rect.left) * scaleX;
+      const my = (e.clientY - rect.top) * scaleY;
+
+      // 如果正持有建筑准备放置
+      if (gameState.selectedType) {
+        if (canPlaceTower(mx, my) && gameState.gold >= towerStats[gameState.selectedType].cost) {
+          gameState.towers.push(new Tower(mx, my, gameState.selectedType));
+          gameState.gold -= towerStats[gameState.selectedType].cost;
+          gameState.selectedType = null;
+          document.querySelectorAll('.tower-card').forEach(c => c.classList.remove('selected'));
+        }
+        return;
+      }
+
+      // 点击已有塔：选中/取消选中
+      const clickedTower = gameState.towers.find(t => Math.hypot(t.x-mx, t.y-my) < 20);
+      if (clickedTower) {
+        gameState.selectedTower = (gameState.selectedTower === clickedTower) ? null : clickedTower;
+      } else {
+        gameState.selectedTower = null;
+      }
+    });
+
+    // 塔卡片选择
+    document.querySelectorAll('.tower-card').forEach(card => {
+      card.addEventListener('click', () => {
+        if (gameState.gameOver) return;
+        const type = card.dataset.tower;
+        const cost = parseInt(card.dataset.cost);
+        if (gameState.gold < cost) {
+          alert('💰 金币不足！');
+          return;
+        }
+        // 切换选择
+        document.querySelectorAll('.tower-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        gameState.selectedType = type;
+        gameState.selectedTower = null;  // 放置模式下取消塔选中
+      });
+    });
+
+    document.getElementById('startWave').addEventListener('click', spawnWave);
+    document.getElementById('restart').addEventListener('click', () => location.reload());
+
+    // 键盘取消选择
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        gameState.selectedType = null;
+        gameState.selectedTower = null;
+        document.querySelectorAll('.tower-card').forEach(c => c.classList.remove('selected'));
+      }
+    });
+
+    // ---------- 启动 ----------
+    refreshUI();
+    gameLoop();
+  })();
+</script>
+</body>
+</html>
