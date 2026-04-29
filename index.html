@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WarmPause - Emotion-Aware Conversation Helper</title>
+    <meta name="description" content="Real-time emotion recognition and response suggestions for high-conflict conversations">
+    <meta name="theme-color" content="#6366f1">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>WarmPause</h1>
+            <p class="subtitle">Emotion-aware conversation helper</p>
+        </header>
+
+        <main>
+            <div class="status-panel">
+                <div id="statusIndicator" class="status-indicator inactive">
+                    <span class="dot"></span>
+                    <span class="label">Ready to listen</span>
+                </div>
+                <p id="statusText" class="status-text">Tap the microphone to start listening to the conversation</p>
+            </div>
+
+            <div class="user-speech-panel">
+                <h3>Your Speech</h3>
+                <p id="userSpeechDisplay" class="user-speech hidden"></p>
+            </div>
+
+            <div class="controls">
+                <button id="toggleListening" class="btn btn-primary">
+                    <span class="icon">🎤</span>
+                    <span class="text">Start Listening</span>
+                </button>
+                <button id="speakResponse" class="btn btn-secondary" disabled>
+                    <span class="icon">🛑</span>
+                    <span class="text">Stop Speak</span>
+                </button>
+            </div>
+
+            <div class="results-panel">
+                <div id="emotionDisplay" class="emotion-display hidden">
+                    <h3>Detected Emotion</h3>
+                    <div class="emotion-result">
+                        <span class="emotion-label">Emotion:</span>
+                        <span id="finalEmotion" class="emotion-value">-</span>
+                    </div>
+                    <div class="audio-features">
+                        <h4>Audio Features</h4>
+                        <div class="feature-item">
+                            <span class="feature-label">Volume:</span>
+                            <span id="volumeValue" class="feature-value">-</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-label">Pitch:</span>
+                            <span id="pitchValue" class="feature-value">-</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-label">Variance:</span>
+                            <span id="varianceValue" class="feature-value">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="responseDisplay" class="response-display hidden">
+                    <h3>Response Suggestion</h3>
+                    <div class="response-content">
+                        <p id="responseText" class="response-text"></p>
+                    </div>
+                    <div class="strategy-content">
+                        <h4>Strategy</h4>
+                        <p id="strategyText" class="strategy-text"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="history-panel">
+                <h3>Recent Suggestions</h3>
+                <div id="historyList" class="history-list"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p class="privacy-note">Your conversations are processed in real-time and not stored</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
