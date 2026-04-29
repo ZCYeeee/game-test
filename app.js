@@ -388,7 +388,7 @@ async function processSpeech(transcript) {
 // Analyze with Deepseek API
 async function analyzeWithDeepseek(transcript, detectedEmotion) {
     const systemPrompt = `You are WarmPause, an emotion-aware conversation assistant. Your task is to:
-1. Analyze the emotional state of the speaker using these emotions: neutral, calm, happy, sad, angry, fearful, disgusted, surprised
+1. Analyze the emotional state of the speaker using these emotions (pay more attention to the emotion than what they said)
 2. Provide a brief strategy explanation
 3. Generate a complete English response sentence that helps de-escalate or improve the conversation
 
