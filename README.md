@@ -44,7 +44,7 @@ A real-time, English-language voice-based emotion recognition and response sugge
 
 ## Privacy
 
-WarmPause processes conversations in real-time and does not store any conversation data. All processing happens through the Web Speech API and Deepseek API with your API key.
+WarmPause processes conversations in real-time and does not store any conversation data.
 
 ## License
 
